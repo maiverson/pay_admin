@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app.models.user import User,Orders,Rate,AdminUser,Income
+from app.models.user import User,Orders,Rate,AdminUser,Income,UserType
 from app.models.order import Order
 from app import db
 from flask_jwt_extended import create_access_token,get_jwt_identity,jwt_required
@@ -7,12 +7,13 @@ from flask_cors import CORS,cross_origin
 import requests
 import json,time
 from config import make_response,parseRequest
+from sqlalchemy import text
 
 
-api_v1 = Blueprint('api_v1', __name__)
-cors = CORS(api_v1)
+admin = Blueprint('admin', __name__)
+cors = CORS(admin)
 
-@api_v1.route('/login', methods=['GET','POST'])
+@admin.route('/login', methods=['GET','POST'])
 def login():
     data = parseRequest(request)
     username = data.get('username')
@@ -40,7 +41,7 @@ def login():
 
     return json
 
-@api_v1.route('/userinfo', methods=['GET','POST'])
+@admin.route('/userinfo', methods=['GET','POST'])
 @jwt_required()
 def get_user_info():
     data = parseRequest(request)
@@ -61,7 +62,7 @@ def get_user_info():
 
     return make_response(code,info,json)
 
-@api_v1.route('/users', methods=['GET'])
+@admin.route('/users', methods=['GET'])
 def get_users():
     users = User.query.all()
 
@@ -74,7 +75,7 @@ def get_users():
 
     return make_response(200,'success',{'users': [{'username': user.username, 'email': user.email} for user in users]})
 
-@api_v1.route('/adduser', methods=['POST','GET'])
+@admin.route('/adduser', methods=['POST','GET'])
 def create_user():
     data = parseRequest(request)
     print(data.get('username'))
@@ -93,7 +94,7 @@ def create_user():
     response = {'message': 'User created successfully!'}
     return make_response(200,'success',response)
 
-@api_v1.route('/getuser', methods=['GET'])
+@admin.route('/getuser', methods=['GET'])
 def get_user():
     data = parseRequest(request)
     user_id = data.get('user_id')
@@ -106,7 +107,7 @@ def get_user():
     response = {'username': user.username, 'email': user.email}
     return make_response(200,'success',response)
 
-@api_v1.route('/users/<int:user_id>', methods=['PUT'])
+@admin.route('/users/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
     user = User.query.get(user_id)
     if not user:
@@ -120,28 +121,8 @@ def update_user(user_id):
     db.session.commit()
     return jsonify({'message': 'User updated successfully!'})
 
-@api_v1.route('/users/<int:user_id>', methods=['DELETE'])
-def delete_user(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
-    db.session.delete(user)
-    db.session.commit()
-    return jsonify({'message': 'User deleted successfully!'})
 
-
-@api_v1.route('/gettestuser', methods=['GET'])
-def get_testusers():
-    users = Users.query.all()
-    roles = Role.query.all()
-    print( users)
-
-    rolist = [role.to_dict() for role in roles]
-    # print(rolist)
-    return make_response(200,'success',rolist)
-
-
-@api_v1.route('/getData', methods=['GET'])
+@admin.route('/getData', methods=['GET'])
 def get_testData():
     url = 'http://yjtx.0534666.com/Manage/TxTradeList?PageNo=1&PageSize=1000&Status=100'
     headers = {'Cookie':'.AspNet.ApplicationCookie=zCT7fSghWi7Z4HyAQuhVIZ0I833ZLbS9pu71QPiQTQDmDKoVzzFugibdMaQ-AaYnbyAOjDMA8EUxlZG1Z1U-IA7GMbIHjtdExwvGWHio7odV1GhxQOekLHUH_muqdvxB21imnRRiNO2lYa7TYo0G5HWIo2-JIRE_xEL8ar-E9SgkySaI0JPlZL7ym1sRVGdRrWDeD28S4iZsN-x66sstO7FeDyDiyEbi73AA5rURUSgWHK2mvHnBpmidv2ncDsCwvPdVTRnewRVGUckVCbjbpwBinH5bt9TnLTNyfabtzqOjWCFBrpgVskjrig9__-593emVSbm3SD2dT2mfIBuEzA'}
@@ -184,7 +165,7 @@ def get_testData():
 
     return make_response(200,'success')
 
-@api_v1.route('/getUsers', methods=['GET','POST'])
+@admin.route('/getUsers', methods=['GET','POST'])
 def get_testUser():
     url = 'http://yjtx.0534666.com/Manage/UserList?PageNo=1&PageSize=30'
     headers = {'Cookie':'.AspNet.ApplicationCookie=zCT7fSghWi7Z4HyAQuhVIZ0I833ZLbS9pu71QPiQTQDmDKoVzzFugibdMaQ-AaYnbyAOjDMA8EUxlZG1Z1U-IA7GMbIHjtdExwvGWHio7odV1GhxQOekLHUH_muqdvxB21imnRRiNO2lYa7TYo0G5HWIo2-JIRE_xEL8ar-E9SgkySaI0JPlZL7ym1sRVGdRrWDeD28S4iZsN-x66sstO7FeDyDiyEbi73AA5rURUSgWHK2mvHnBpmidv2ncDsCwvPdVTRnewRVGUckVCbjbpwBinH5bt9TnLTNyfabtzqOjWCFBrpgVskjrig9__-593emVSbm3SD2dT2mfIBuEzA'}
@@ -230,7 +211,7 @@ def formatTime(timeStr):
     tre_otherStyleTime = time.strftime("%Y-%m-%d %H:%M:%S", tre_timeArray)
     return tre_otherStyleTime
 
-@api_v1.route('/getperformance', methods=['GET'])
+@admin.route('/getperformance', methods=['GET'])
 def getperformance():
     data = parseRequest(request)
     user_id = data.get('userid')
@@ -239,17 +220,6 @@ def getperformance():
     total_performance = calculate_total_performance(top_user)
     # print(rolist)
     return make_response(200,'success',total_performance)
-
-@api_v1.route('/test', methods=['GET'])
-def getp():
-    users = User.query.all()
-    for user in users:
-        user.balance = 0
-        user.totalIncome = 0
-        print(user.name)
-    db.session.commit()
-
-    return make_response(200,'success')
 
 
 
@@ -278,3 +248,175 @@ def get_all_ancestors(proxy_id,rate,total,orginal_userid,orderid,time):
                 recursive_query(proxy.parent_id,proxy.baserate,total,orginal_userid,orderid,time)
 
     recursive_query(proxy_id,rate,total,orginal_userid,orderid,time)
+
+
+
+@admin.route('/adduser', methods=['GET','POST'])
+def addUser():
+    data = parseRequest(request)
+    print(data)
+
+    username = data.get('name')
+    phone = data.get('phone')
+    card = data.get('card')
+    rate = data.get('rate')
+    type = data.get('type')
+
+    userType = UserType.query.get(type)
+    status = 1
+
+
+    print(username,phone,status)
+    info = ''
+    code = 1
+    json = ''
+    user = User(name=username, password='111111', userType=userType.id,userTypeName=userType.typename, mobile=phone, certno=card, status=status, baserate=rate)
+    db.session.add(user)
+    db.session.commit()
+    info = '用户添加成功'
+    code = 1
+
+
+    return make_response(code, info, json)
+
+
+@admin.route('/updateuser', methods=['GET','POST'])
+def updateUser():
+    info = ''
+    code = 1
+    json = ''
+
+    data = parseRequest(request)
+    print(data,request)
+
+    username = data.get('name')
+    phone = data.get('phone')
+    card = data.get('card')
+    rate = data.get('rate')
+    type = data.get('type')
+    userid = data.get('userid')
+    if not userid:
+        code = 0
+        info = '参数错误'
+        return make_response(code, info)
+
+    userType = UserType.query.get(type)
+    status = 1
+
+    user = User.query.get(userid)
+
+    user.name = username
+    user.userType = userType.id
+    user.userTypeName = userType.typename
+    user.mobile = phone
+    user.certno = card
+    user.baserate = rate
+    db.session.commit()
+    info = '用户编辑成功'
+    code = 1
+
+
+    return make_response(code, info, json)
+
+@admin.route('/deleteuser', methods=['GET','POST'])
+def deleteUser():
+    info = ''
+    code = 1
+    json = ''
+
+    data = parseRequest(request)
+    print(data,request)
+    userid = data.get('userid')
+    if not userid:
+        code = 0
+        info = '参数错误'
+        return make_response(code, info)
+
+    user = User.query.get(userid)
+    if not user:
+        code = 0
+        info = '用户不存在'
+        return make_response(code, info)
+    db.session.delete(user)
+    db.session.commit()
+    info = '用户删除成功'
+    code = 1
+
+
+    return make_response(code, info, json)
+
+
+
+@admin.route('/getuserist', methods=['GET','POST'])
+def getUserList():
+    data = parseRequest(request)
+    tmppage = data.get('page')
+    tmplimit = data.get('limit')
+    name = data.get('name')
+    type = data.get('type')
+    print('类型===',type)
+    page = 1
+    limit = 20
+    # 分页查询
+    orderby = data.get('sort')
+    if not tmppage:
+        page = 1
+    else:
+        page = int(tmppage)
+    if not tmplimit:
+        limit = 20
+    else:
+        limit = int(tmplimit)
+
+    orderStr = text('-time')
+    if(orderby):
+        orderStr = text(orderby)
+    else:
+        orderStr = text('-time')
+
+    sql = User.query.order_by(orderStr)
+    if name:
+        sql = User.query.order_by(orderStr).filter(User.name.contains(name))
+    else:
+        sql = User.query.order_by(orderStr)
+
+    if type:
+        sql = sql.filter_by(userType=type)
+
+
+    lists = sql.limit(limit).offset((page - 1) * limit).all()
+    total_count = sql.count()
+    total_pages = (total_count + limit - 1) // limit
+
+
+    info = ''
+    status = 1
+    json = ''
+    if not lists:
+        status = 0
+        info = '暂无用户信息'
+    else:
+        status = 1
+        info = '请求成功'
+
+        json = {'items': [item.to_dict() for item in lists ],'total':total_count}
+
+
+    return make_response(status,info,json)
+
+@admin.route('/getusertype', methods=['GET','POST'])
+# @jwt_required()
+def get_user_type():
+    typeList = UserType.query.all()
+    code = 1
+    info = '成功'
+    json = ''
+    if not typeList:
+        code = 0
+        info = '请求失败'
+    else:
+        code = 1
+        json = {'items': [item.to_dict() for item in typeList ]}
+
+
+    return make_response(code,info,json)

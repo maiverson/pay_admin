@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app.models.user import User
+from app.models.user import User,Orders
 from app.models.order import Order,DragTable
 from app import db
 from flask_jwt_extended import create_access_token,get_jwt_identity,jwt_required
@@ -9,6 +9,8 @@ from app.views import make_response,parseRequest
 import requests
 import json
 from sqlalchemy_serializer import SerializerMixin
+from sqlalchemy import text
+
 
 order = Blueprint('order', __name__)
 cors = CORS(order)
@@ -37,22 +39,60 @@ def addOrder():
     return make_response(code, info, json)
 
 
+# @order.route('/getorderList', methods=['GET','POST'])
+# def getAllOrder():
+#     orders = Orders.query.all()
+#
+#     info = ''
+#     status = 1
+#     json = ''
+#     if not orders:
+#         status = 0
+#         info = '暂无订单信息'
+#     else:
+#         status = 1
+#         info = '请求成功'
+#         total = Order.query.count()
+#         json = {'items': [{'order_no': order.order_no, 'price': order.price,'status':order.status,'timestamp':order.timestamp,'username':order.username} for order in orders],'total':total}
+#     return make_response(status,info,json)
+
+
 @order.route('/getorderList', methods=['GET','POST'])
 def getAllOrder():
-    orders = Order.query.all()
+    data = parseRequest(request)
+    tmppage = data.get('page')
+    tmplimit = data.get('limit')
+    page = 1
+    limit = 20
+    # 分页查询
+
+    if not tmppage:
+        page = 1
+    else:
+        page = int(tmppage)
+    if not tmplimit:
+        limit = 20
+    else:
+        limit = int(tmplimit)
+
+
+    lists = Orders.query.order_by(text('-time')).limit(limit).offset((page - 1) * limit).all()
+    total_count = Orders.query.count()
+    total_pages = (total_count + limit - 1) // limit
 
     info = ''
     status = 1
     json = ''
-    if not orders:
+    if not lists:
         status = 0
         info = '暂无订单信息'
     else:
         status = 1
         info = '请求成功'
-        total = Order.query.count()
-        json = {'items': [{'order_no': order.order_no, 'price': order.price,'status':order.status,'timestamp':order.timestamp,'username':order.username} for order in orders],'total':total}
+        json = {'items': [item.to_dict() for item in lists ],'total':total_count}
+        print(json)
     return make_response(status,info,json)
+
 
 
 def get_order_code():
@@ -117,3 +157,21 @@ def getTableList():
 
     return make_response(status,info,json)
 
+
+
+def get_all_ancestors(proxy_id,rate,total):
+    ancestors = []
+
+    def recursive_query(proxy_id,rate,total):
+        proxy = User.query.get(proxy_id)
+
+        if proxy:
+            ancestors.append(proxy)
+            income = (rate - proxy.baserate)*total/100
+            proxy.totalIncome += income
+            proxy.balance +=income
+            if proxy.parent_id:
+                recursive_query(proxy.parent_id,proxy.baserate,total)
+
+    recursive_query(proxy_id)
+    return ancestors

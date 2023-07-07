@@ -1,9 +1,13 @@
 from app import app, db
 from app.models.user import User
-from app.models.order import Order
+# from app.models.order import Order
 from flask import jsonify
 
 # db.create_all(app=app)
+
+with app.app_context():
+    print('shkakfkakfa')
+    db.create_all()
 
 def make_response(status_code, message, data=None):
     response = {
@@ -15,9 +19,7 @@ def make_response(status_code, message, data=None):
 
 
 def parseRequest(req):
-    data = {}
     if req.method == 'GET':
-        data = req.args
+        return req.args
     elif req.method == 'POST':
-        data = req.form
-    return data
+        return req.json

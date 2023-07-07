@@ -8,7 +8,9 @@ manager = Manager(app)
 
 @manager.command
 def create_db():
-    db.create_all()
+    print ('创建数据库')
+    db.create_all(app=app)
 
 if __name__ == '__main__':
+    print ('sss')
     manager.run()
